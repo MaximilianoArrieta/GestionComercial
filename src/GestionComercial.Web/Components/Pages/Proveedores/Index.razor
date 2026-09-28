@@ -1,0 +1,208 @@
+@page "/proveedores"
+@rendermode InteractiveServer
+@inject IProveedorService ProveedorService
+
+<PageTitle>Proveedores</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-truck"></i> Proveedores</h1>
+    <button class="btn btn-primary" @onclick="AbrirNuevo">
+        <i class="bi bi-plus-lg"></i> Nuevo Proveedor
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(_mensaje))
+{
+    <div class="alert @(_mensajeEsError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+        @_mensaje
+        <button type="button" class="btn-close" @onclick="() => _mensaje = string.Empty"></button>
+    </div>
+}
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        @if (_cargando)
+        {
+            <div class="spinner-border text-primary" role="status"></div>
+        }
+        else if (!_proveedores.Any())
+        {
+            <p class="text-muted mb-0">No hay proveedores cargados todavía.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Razón Social</th>
+                            <th>CUIT</th>
+                            <th>Teléfono</th>
+                            <th>Email</th>
+                            <th>Estado</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in _proveedores)
+                        {
+                            <tr>
+                                <td>@p.Nombre</td>
+                                <td>@p.Cuit</td>
+                                <td>@p.Telefono</td>
+                                <td>@p.Email</td>
+                                <td>
+                                    @if (p.Activo)
+                                    {
+                                        <span class="badge bg-success">Activo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Inactivo</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => AbrirEditar(p)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(p.Id)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@* ---- Modal Alta / Edición (Bootstrap, controlado por variable C#) ---- *@
+@if (_mostrarModal)
+{
+    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <EditForm Model="_proveedorEditando" OnValidSubmit="GuardarAsync">
+                    <DataAnnotationsValidator />
+                    <div class="modal-header">
+                        <h5 class="modal-title">@(_proveedorEditando.Id == 0 ? "Nuevo Proveedor" : "Editar Proveedor")</h5>
+                        <button type="button" class="btn-close" @onclick="CerrarModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <ValidationSummary class="text-danger" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Razón Social</label>
+                            <InputText class="form-control" @bind-Value="_proveedorEditando.Nombre" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">CUIT</label>
+                            <InputText class="form-control" @bind-Value="_proveedorEditando.Cuit" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Teléfono</label>
+                            <InputText class="form-control" @bind-Value="_proveedorEditando.Telefono" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <InputText class="form-control" @bind-Value="_proveedorEditando.Email" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Dirección</label>
+                            <InputText class="form-control" @bind-Value="_proveedorEditando.Direccion" />
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="_proveedorEditando.Activo" />
+                            <label class="form-check-label">Activo</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Proveedor> _proveedores = new();
+    private Proveedor _proveedorEditando = new();
+    private bool _mostrarModal;
+    private bool _cargando = true;
+    private string _mensaje = string.Empty;
+    private bool _mensajeEsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _proveedores = await ProveedorService.ObtenerTodosAsync();
+        _cargando = false;
+    }
+
+    private void AbrirNuevo()
+    {
+        _proveedorEditando = new Proveedor();
+        _mostrarModal = true;
+    }
+
+    private void AbrirEditar(Proveedor p)
+    {
+        // Copia para no mutar la grilla mientras se edita
+        _proveedorEditando = new Proveedor
+        {
+            Id = p.Id,
+            Nombre = p.Nombre,
+            Cuit = p.Cuit,
+            Telefono = p.Telefono,
+            Email = p.Email,
+            Direccion = p.Direccion,
+            Activo = p.Activo
+        };
+        _mostrarModal = true;
+    }
+
+    private void CerrarModal() => _mostrarModal = false;
+
+    private async Task GuardarAsync()
+    {
+        if (_proveedorEditando.Id == 0)
+        {
+            await ProveedorService.CrearAsync(_proveedorEditando);
+            _mensaje = "Proveedor creado correctamente.";
+        }
+        else
+        {
+            await ProveedorService.ActualizarAsync(_proveedorEditando);
+            _mensaje = "Proveedor actualizado correctamente.";
+        }
+
+        _mensajeEsError = false;
+        _mostrarModal = false;
+        await CargarAsync();
+    }
+
+    private async Task EliminarAsync(int id)
+    {
+        var ok = await ProveedorService.EliminarAsync(id);
+        if (ok)
+        {
+            _mensaje = "Proveedor eliminado.";
+            _mensajeEsError = false;
+        }
+        else
+        {
+            _mensaje = "No se puede eliminar: el proveedor tiene productos asociados.";
+            _mensajeEsError = true;
+        }
+        await CargarAsync();
+    }
+}

@@ -1,0 +1,234 @@
+@page "/productos"
+@rendermode InteractiveServer
+@inject IProductoService ProductoService
+@inject IProveedorService ProveedorService
+
+<PageTitle>Productos</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-box-seam"></i> Productos</h1>
+    <button class="btn btn-primary" @onclick="AbrirNuevo" disabled="@(!_proveedores.Any())">
+        <i class="bi bi-plus-lg"></i> Nuevo Producto
+    </button>
+</div>
+
+@if (!_proveedores.Any() && !_cargando)
+{
+    <div class="alert alert-warning">Cargá al menos un proveedor antes de crear productos.</div>
+}
+
+@if (!string.IsNullOrEmpty(_mensaje))
+{
+    <div class="alert @(_mensajeEsError ? "alert-danger" : "alert-success") alert-dismissible fade show" role="alert">
+        @_mensaje
+        <button type="button" class="btn-close" @onclick="() => _mensaje = string.Empty"></button>
+    </div>
+}
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        @if (_cargando)
+        {
+            <div class="spinner-border text-primary" role="status"></div>
+        }
+        else if (!_productos.Any())
+        {
+            <p class="text-muted mb-0">No hay productos cargados todavía.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Proveedor</th>
+                            <th class="text-end">Precio</th>
+                            <th class="text-end">Stock</th>
+                            <th>Estado</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in _productos)
+                        {
+                            <tr class="@(p.Stock <= p.StockMinimo ? "stock-bajo" : "")">
+                                <td>@p.Nombre</td>
+                                <td>@(p.Proveedor?.Nombre ?? "-")</td>
+                                <td class="text-end">@p.Precio.ToString("C2")</td>
+                                <td class="text-end">@p.Stock</td>
+                                <td>
+                                    @if (p.Activo)
+                                    {
+                                        <span class="badge bg-success">Activo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Inactivo</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => AbrirEditar(p)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(p.Id)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (_mostrarModal)
+{
+    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <EditForm Model="_productoEditando" OnValidSubmit="GuardarAsync">
+                    <DataAnnotationsValidator />
+                    <div class="modal-header">
+                        <h5 class="modal-title">@(_productoEditando.Id == 0 ? "Nuevo Producto" : "Editar Producto")</h5>
+                        <button type="button" class="btn-close" @onclick="CerrarModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <ValidationSummary class="text-danger" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Nombre</label>
+                            <InputText class="form-control" @bind-Value="_productoEditando.Nombre" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descripción</label>
+                            <InputTextArea class="form-control" @bind-Value="_productoEditando.Descripcion" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Proveedor</label>
+                            <InputSelect class="form-select" @bind-Value="_productoEditando.ProveedorId">
+                                <option value="0">-- Seleccionar --</option>
+                                @foreach (var prov in _proveedores)
+                                {
+                                    <option value="@prov.Id">@prov.Nombre</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Precio</label>
+                                <InputNumber class="form-control" @bind-Value="_productoEditando.Precio" />
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label">Stock</label>
+                                <InputNumber class="form-control" @bind-Value="_productoEditando.Stock" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Stock Mínimo (alerta)</label>
+                            <InputNumber class="form-control" @bind-Value="_productoEditando.StockMinimo" />
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="_productoEditando.Activo" />
+                            <label class="form-check-label">Activo</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Producto> _productos = new();
+    private List<Proveedor> _proveedores = new();
+    private Producto _productoEditando = new();
+    private bool _mostrarModal;
+    private bool _cargando = true;
+    private string _mensaje = string.Empty;
+    private bool _mensajeEsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        _cargando = true;
+        _productos = await ProductoService.ObtenerTodosAsync();
+        _proveedores = await ProveedorService.ObtenerTodosAsync();
+        _cargando = false;
+    }
+
+    private void AbrirNuevo()
+    {
+        _productoEditando = new Producto { StockMinimo = 5 };
+        _mostrarModal = true;
+    }
+
+    private void AbrirEditar(Producto p)
+    {
+        _productoEditando = new Producto
+        {
+            Id = p.Id,
+            Nombre = p.Nombre,
+            Descripcion = p.Descripcion,
+            Precio = p.Precio,
+            Stock = p.Stock,
+            StockMinimo = p.StockMinimo,
+            ProveedorId = p.ProveedorId,
+            Activo = p.Activo
+        };
+        _mostrarModal = true;
+    }
+
+    private void CerrarModal() => _mostrarModal = false;
+
+    private async Task GuardarAsync()
+    {
+        if (_productoEditando.ProveedorId == 0)
+        {
+            _mensaje = "Debe seleccionar un proveedor.";
+            _mensajeEsError = true;
+            return;
+        }
+
+        if (_productoEditando.Id == 0)
+        {
+            await ProductoService.CrearAsync(_productoEditando);
+            _mensaje = "Producto creado correctamente.";
+        }
+        else
+        {
+            await ProductoService.ActualizarAsync(_productoEditando);
+            _mensaje = "Producto actualizado correctamente.";
+        }
+
+        _mensajeEsError = false;
+        _mostrarModal = false;
+        await CargarAsync();
+    }
+
+    private async Task EliminarAsync(int id)
+    {
+        var ok = await ProductoService.EliminarAsync(id);
+        if (ok)
+        {
+            _mensaje = "Producto eliminado.";
+            _mensajeEsError = false;
+        }
+        else
+        {
+            _mensaje = "No se puede eliminar: el producto tiene ventas asociadas.";
+            _mensajeEsError = true;
+        }
+        await CargarAsync();
+    }
+}

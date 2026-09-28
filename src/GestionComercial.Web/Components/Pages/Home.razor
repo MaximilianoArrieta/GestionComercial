@@ -1,0 +1,122 @@
+@page "/"
+@rendermode InteractiveServer
+@inject IProductoService ProductoService
+@inject IVentaService VentaService
+@inject IProveedorService ProveedorService
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1 class="mb-4">Dashboard</h1>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card text-bg-primary shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title">Proveedores</h6>
+                <p class="display-6 mb-0">@_totalProveedores</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-success shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title">Productos</h6>
+                <p class="display-6 mb-0">@_totalProductos</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-warning shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title">Ventas registradas</h6>
+                <p class="display-6 mb-0">@_totalVentas</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-triangle text-warning"></i> Productos con Stock Bajo</span>
+        <span class="badge bg-secondary">@_productosStockBajo.Count encontrados</span>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small">
+            Este panel es interactivo (InteractiveServer): al mover el umbral se recalcula
+            sin recargar la página.
+        </p>
+        <div class="mb-3" style="max-width:400px;">
+            <label class="form-label">Umbral de stock mínimo a considerar: <strong>@_umbral</strong></label>
+            <input type="range" class="form-range" min="0" max="50" @bind="_umbral" @bind:event="oninput" @bind:after="RecalcularAsync" />
+        </div>
+
+        @if (_cargando)
+        {
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+        }
+        else if (!_productosStockBajo.Any())
+        {
+            <div class="alert alert-success mb-0">No hay productos con stock por debajo del umbral seleccionado.</div>
+        }
+        else
+        {
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Proveedor</th>
+                        <th class="text-end">Stock actual</th>
+                        <th class="text-end">Mínimo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in _productosStockBajo)
+                    {
+                        <tr class="@(p.Stock <= _umbral ? "stock-bajo" : "")">
+                            <td>@p.Nombre</td>
+                            <td>@(p.Proveedor?.Nombre ?? "-")</td>
+                            <td class="text-end">@p.Stock</td>
+                            <td class="text-end">@p.StockMinimo</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    private int _totalProveedores;
+    private int _totalProductos;
+    private int _totalVentas;
+    private int _umbral = 5;
+    private bool _cargando = true;
+    private List<Producto> _productosStockBajo = new();
+    private List<Producto> _todosLosProductos = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _todosLosProductos = await ProductoService.ObtenerTodosAsync();
+        _totalProveedores = (await ProveedorService.ObtenerTodosAsync()).Count;
+        _totalProductos = _todosLosProductos.Count;
+        _totalVentas = (await VentaService.ObtenerTodasAsync()).Count;
+
+        RecalcularStockBajo();
+        _cargando = false;
+    }
+
+    // Llamado en vivo cuando el usuario mueve el slider (sin recargar la página)
+    private Task RecalcularAsync()
+    {
+        RecalcularStockBajo();
+        return Task.CompletedTask;
+    }
+
+    private void RecalcularStockBajo()
+    {
+        _productosStockBajo = _todosLosProductos
+            .Where(p => p.Activo && p.Stock <= _umbral)
+            .OrderBy(p => p.Stock)
+            .ToList();
+    }
+}

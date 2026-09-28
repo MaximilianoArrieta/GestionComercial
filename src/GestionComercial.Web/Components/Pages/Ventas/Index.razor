@@ -1,0 +1,115 @@
+@page "/ventas"
+@rendermode InteractiveServer
+@inject IVentaService VentaService
+@inject NavigationManager Nav
+
+<PageTitle>Ventas</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-cart-check"></i> Ventas</h1>
+    <button class="btn btn-primary" @onclick="IrANueva">
+        <i class="bi bi-plus-lg"></i> Nueva Venta
+    </button>
+</div>
+
+<div class="mb-3" style="max-width:400px;">
+    <input class="form-control" placeholder="Buscar por cliente..." @bind="_filtro" @bind:event="oninput" @bind:after="BuscarAsync" />
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        @if (_cargando)
+        {
+            <div class="spinner-border text-primary" role="status"></div>
+        }
+        else if (!_ventas.Any())
+        {
+            <p class="text-muted mb-0">No se encontraron ventas.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Cliente</th>
+                            <th class="text-end">Líneas</th>
+                            <th class="text-end">Total</th>
+                            <th>Estado</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var v in _ventas)
+                        {
+                            <tr>
+                                <td>@v.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@v.ClienteNombre</td>
+                                <td class="text-end">@v.Detalles.Count</td>
+                                <td class="text-end">@v.Total.ToString("C2")</td>
+                                <td>
+                                    @switch (v.Estado)
+                                    {
+                                        case EstadoVenta.Confirmada:
+                                            <span class="badge bg-success">Confirmada</span>
+                                            break;
+                                        case EstadoVenta.Anulada:
+                                            <span class="badge bg-danger">Anulada</span>
+                                            break;
+                                        default:
+                                            <span class="badge bg-warning text-dark">Pendiente</span>
+                                            break;
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    @if (v.Estado != EstadoVenta.Anulada)
+                                    {
+                                        <button class="btn btn-sm btn-outline-warning me-1" @onclick="() => AnularAsync(v.Id)">
+                                            <i class="bi bi-x-circle"></i> Anular
+                                        </button>
+                                    }
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarAsync(v.Id)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Venta> _ventas = new();
+    private string _filtro = string.Empty;
+    private bool _cargando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ventas = await VentaService.ObtenerTodasAsync();
+        _cargando = false;
+    }
+
+    // Búsqueda en vivo: se ejecuta en el servidor sin recargar la página (InteractiveServer)
+    private async Task BuscarAsync()
+    {
+        _ventas = await VentaService.BuscarAsync(_filtro);
+    }
+
+    private void IrANueva() => Nav.NavigateTo("/ventas/nueva");
+
+    private async Task AnularAsync(int id)
+    {
+        await VentaService.AnularAsync(id);
+        await BuscarAsync();
+    }
+
+    private async Task EliminarAsync(int id)
+    {
+        await VentaService.EliminarAsync(id);
+        await BuscarAsync();
+    }
+}

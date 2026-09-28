@@ -1,0 +1,170 @@
+@page "/ventas/nueva"
+@rendermode InteractiveServer
+@inject IVentaService VentaService
+@inject IProductoService ProductoService
+@inject NavigationManager Nav
+
+<PageTitle>Nueva Venta</PageTitle>
+
+<h1 class="mb-4"><i class="bi bi-cart-plus"></i> Nueva Venta</h1>
+
+@if (_cargando)
+{
+    <div class="spinner-border text-primary" role="status"></div>
+}
+else
+{
+    <EditForm Model="_venta" OnValidSubmit="GuardarAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" />
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="mb-3" style="max-width:400px;">
+                    <label class="form-label">Cliente</label>
+                    <InputText class="form-control" @bind-Value="_venta.ClienteNombre" />
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Detalle de productos</span>
+                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AgregarLinea">
+                    <i class="bi bi-plus-lg"></i> Agregar línea
+                </button>
+            </div>
+            <div class="card-body">
+                @if (!_venta.Detalles.Any())
+                {
+                    <p class="text-muted mb-0">Agregá al menos un producto.</p>
+                }
+                else
+                {
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width:40%">Producto</th>
+                                <th style="width:15%">Cantidad</th>
+                                <th style="width:20%">Precio Unit.</th>
+                                <th style="width:15%">Subtotal</th>
+                                <th style="width:10%"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var linea in _venta.Detalles)
+                            {
+                                <tr>
+                                    <td>
+                                        <select class="form-select" value="@linea.ProductoId"
+                                                @onchange="e => SeleccionarProducto(linea, e.Value?.ToString())">
+                                            <option value="0">-- Seleccionar --</option>
+                                            @foreach (var prod in _productos)
+                                            {
+                                                <option value="@prod.Id">@prod.Nombre (stock: @prod.Stock)</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" min="1" class="form-control" value="@linea.Cantidad"
+                                               @onchange="e => ActualizarCantidad(linea, e.Value?.ToString())" />
+                                    </td>
+                                    <td>@linea.PrecioUnitario.ToString("C2")</td>
+                                    <td>@((linea.Cantidad * linea.PrecioUnitario).ToString("C2"))</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => QuitarLinea(linea)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <div class="text-end">
+                        <h5>Total: @_venta.Detalles.Sum(d => d.Cantidad * d.PrecioUnitario).ToString("C2")</h5>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary" disabled="@(!_venta.Detalles.Any())">
+                <i class="bi bi-check-lg"></i> Confirmar Venta
+            </button>
+            <button type="button" class="btn btn-secondary" @onclick="Cancelar">Cancelar</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    private Venta _venta = new();
+    private List<Producto> _productos = new();
+    private bool _cargando = true;
+    private string _error = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _productos = await ProductoService.ObtenerTodosAsync();
+        _cargando = false;
+    }
+
+    private void AgregarLinea()
+    {
+        _venta.Detalles.Add(new VentaDetalle { Cantidad = 1 });
+    }
+
+    private void QuitarLinea(VentaDetalle linea)
+    {
+        _venta.Detalles.Remove(linea);
+    }
+
+    private void SeleccionarProducto(VentaDetalle linea, string? productoIdTexto)
+    {
+        if (int.TryParse(productoIdTexto, out var productoId))
+        {
+            var producto = _productos.FirstOrDefault(p => p.Id == productoId);
+            linea.ProductoId = productoId;
+            linea.PrecioUnitario = producto?.Precio ?? 0;
+        }
+    }
+
+    private void ActualizarCantidad(VentaDetalle linea, string? cantidadTexto)
+    {
+        if (int.TryParse(cantidadTexto, out var cantidad) && cantidad > 0)
+        {
+            linea.Cantidad = cantidad;
+        }
+    }
+
+    private async Task GuardarAsync()
+    {
+        if (_venta.Detalles.Any(d => d.ProductoId == 0))
+        {
+            _error = "Todas las líneas deben tener un producto seleccionado.";
+            return;
+        }
+
+        var stockInsuficiente = _venta.Detalles.Any(d =>
+        {
+            var prod = _productos.FirstOrDefault(p => p.Id == d.ProductoId);
+            return prod is not null && d.Cantidad > prod.Stock;
+        });
+
+        if (stockInsuficiente)
+        {
+            _error = "Hay líneas con cantidad mayor al stock disponible.";
+            return;
+        }
+
+        _venta.Estado = EstadoVenta.Confirmada;
+        await VentaService.CrearAsync(_venta);
+        Nav.NavigateTo("/ventas");
+    }
+
+    private void Cancelar() => Nav.NavigateTo("/ventas");
+}
