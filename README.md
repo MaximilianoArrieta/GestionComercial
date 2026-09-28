@@ -104,7 +104,7 @@ editable). Resumen de relaciones:
 
 ---
 
-## 6. Repositorio Git (desde Visual Studio, sin comandos)
+## 5. Repositorio Git (desde Visual Studio, sin comandos)
 
 El repositorio local ya está inicializado con commits. Para publicarlo:
 1. `Git > Crear repositorio Git...` (o `Git > Configuración`) en Visual Studio.
@@ -113,7 +113,7 @@ El repositorio local ya está inicializado con commits. Para publicarlo:
 
 ---
 
-## 7. Despliegue gratuito con SQL Server: Somee.com (desde Visual Studio)
+## 6. Despliegue gratuito con SQL Server: Somee.com (desde Visual Studio)
 
 Somee ofrece hosting ASP.NET y base MSSQL gratuitos, la opción más fiel a SQL Server 2014.
 
@@ -138,7 +138,7 @@ Somee ofrece hosting ASP.NET y base MSSQL gratuitos, la opción más fiel a SQL 
 
 ---
 
-## 8. Capturas de pantalla
+## 7. Capturas de pantalla
 
 No pude ejecutar la app en mi entorno, así que las capturas deben tomarse
 en tu máquina tras el Paso 4 (tecla `Win+Shift+S`). Guardarlas en `docs/capturas/`:
@@ -146,7 +146,7 @@ Dashboard, Proveedores (con modal), Productos, Ventas y Nueva Venta con 2+ líne
 
 ---
 
-## 9. Resumen de entidades de negocio
+## 8. Resumen de entidades de negocio
 
 | Entidad | Descripción | Campos clave |
 |---|---|---|
